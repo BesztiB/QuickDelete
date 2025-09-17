@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Telegram.Bot" Version="19.0.0" />
-    <None Include="settings.json">
+    <None Include="example-settings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
