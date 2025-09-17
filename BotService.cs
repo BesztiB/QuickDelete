@@ -98,11 +98,11 @@ public sealed class BotService : IAsyncDisposable
             if (msg.Chat.Type is not ChatType.Supergroup and not ChatType.Group) return;
             if (!_settings.AllowedChatIds.Contains(msg.Chat.Id)) return;
 
-            // Commands (only from admins)
+            // Commands
             if (msg.Text is not null && msg.Text.StartsWith("/"))
             {
-                await HandleCommandAsync(msg, ct);
-                return;
+                var isMessageUsed = await HandleCommandAsync(msg, ct);
+                if (isMessageUsed) return;
             }
 
             // Pinned-message event => exclude from deletion if we had it scheduled
@@ -124,11 +124,29 @@ public sealed class BotService : IAsyncDisposable
         }
     }
 
-    private async Task HandleCommandAsync(Message msg, CancellationToken ct)
+    private async Task<bool> HandleCommandAsync(Message msg, CancellationToken ct)
     {
         var text = msg.Text!.Trim();
         var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var cmd = parts[0].ToLowerInvariant();
+
+        if (cmd is "/roll" or "/roll@")
+        {
+            var max = 8;
+            if (parts.Length >= 2 && int.TryParse(parts[1], out var parsed) && parsed > 1)
+            {
+                max = Math.Clamp(parsed, 2, 100000);
+            }
+            var rnd = new Random();
+            var roll = rnd.Next(1, max + 1);
+            await _bot.SendTextMessageAsync(msg.Chat.Id,
+                $"🎲(1-{max}) You rolled a *{roll}*",
+                parseMode: ParseMode.Markdown,
+                messageThreadId: msg.MessageThreadId,
+                replyToMessageId: msg.MessageId,
+                cancellationToken: ct);
+            return true;
+        }
 
         if (cmd is "/autodelete" or "/autodelete@")
         {
@@ -141,7 +159,7 @@ public sealed class BotService : IAsyncDisposable
                     messageThreadId: msg.MessageThreadId,
                     replyToMessageId: msg.MessageId,
                     cancellationToken: ct);
-                return;
+                return true;
             }
 
             if (parts.Length < 2 || !int.TryParse(parts[1], out var minutes) || minutes < 0)
@@ -152,7 +170,7 @@ public sealed class BotService : IAsyncDisposable
                     messageThreadId: msg.MessageThreadId,
                     replyToMessageId: msg.MessageId,
                     cancellationToken: ct);
-                return;
+                return true;
             }
 
             var key = TopicKey(msg.Chat.Id, msg.MessageThreadId);
@@ -181,6 +199,7 @@ public sealed class BotService : IAsyncDisposable
                 messageThreadId: msg.MessageThreadId,
                 replyToMessageId: msg.MessageId,
                 cancellationToken: ct);
+            return true;
         }
 
         if (cmd is "/deletemaxmessages" or "/deletemaxmessages@")
@@ -194,7 +213,7 @@ public sealed class BotService : IAsyncDisposable
                     messageThreadId: msg.MessageThreadId,
                     replyToMessageId: msg.MessageId,
                     cancellationToken: ct);
-                return;
+                return true;
             }
 
             if (parts.Length < 2 || !int.TryParse(parts[1], out var maxMessages) || maxMessages < 0)
@@ -205,7 +224,7 @@ public sealed class BotService : IAsyncDisposable
                     messageThreadId: msg.MessageThreadId,
                     replyToMessageId: msg.MessageId,
                     cancellationToken: ct);
-                return;
+                return true;
             }
 
             var key = TopicKey(msg.Chat.Id, msg.MessageThreadId);
@@ -234,7 +253,9 @@ public sealed class BotService : IAsyncDisposable
                 messageThreadId: msg.MessageThreadId,
                 replyToMessageId: msg.MessageId,
                 cancellationToken: ct);
+            return true;
         }
+        return false;
     }
 
     private async Task MaybeScheduleDeleteAsync(Message msg, CancellationToken ct)
