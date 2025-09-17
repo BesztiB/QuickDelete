@@ -1,0 +1,6 @@
+{
+  "BotToken": "PUT BOT TOKEN HERE",
+  "AllowedChatIds": [
+    -1003017853231
+  ]
+}
